@@ -8,7 +8,9 @@
       "version": "latest",
       "enableNonRootDocker": "true",
       "moby": "true"
-    }
+    },
+    "ghcr.io/devcontainers/features/postgres:1": "18",
+    "ghcr.io/devcontainers/features/redis:1": "8"
   },
   "customizations": {
     "vscode": {
@@ -18,12 +20,16 @@
       },
       "extensions": [
         "ms-python.python",
+        "ms-toolsai.jupyter",
+        "ms-vscode.cpptools",
+        "prisma.prisma",
+        "tamasfe.even-better-toml",
         "ms-azuretools.vscode-docker",
         "esbenp.prettier-vscode",
         "github.copilot"
       ]
     }
   },
-  "postCreateCommand": "npm install -g @anthropic-ai/claude-code",
+  "postCreateCommand": "curl -LsSf https://astral.sh/uv/install.sh | sh && npm install -g pnpm @anthropic-ai/claude-code",
   "remoteUser": "codespace"
 }
