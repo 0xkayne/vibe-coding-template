@@ -2,45 +2,70 @@
 
 用于 Claude Code vibe coding 的工程规范模板。从此模板创建新项目后，自动获得工业级编码约束。
 
-## 文件结构与加载机制
+## 文件结构
 
 ```
-CLAUDE.md                         ← 每次会话都加载（通用铁律 + 工作流）
+CLAUDE.md                                  ← 每次加载。铁律 + 工作流
 .claude/
+  settings.json                            ← Hooks。确定性安全护栏
   rules/
-    typescript.md                 ← 仅当编辑 .ts/.tsx 文件时加载
-    python.md                     ← 仅当编辑 .py 文件时加载
-    data-layer.md                 ← 仅当编辑 DB/Redis 相关文件时加载
+    typescript.md                          ← 仅编辑 .ts/.tsx 时加载
+    python.md                              ← 仅编辑 .py 时加载
+    data-layer.md                          ← 仅编辑 DB/Redis 相关文件时加载
+  skills/
+    tdd-workflow/SKILL.md                  ← TDD Red-Green-Refactor 流程
+    architecture-blueprint/SKILL.md        ← 需求分析 → plan.md → 任务拆解
+    debug-forensics/SKILL.md               ← 结构化排错流程
+  agents/
+    code-reviewer.md                       ← 代码审查子代理
 ```
 
-### 为什么这样设计？
+## 设计原理
 
-1. **Token 效率**：`CLAUDE.md` 主文件控制在 ~400 词（~600 tokens），每轮对话仅消耗极少上下文。技术栈特定规则通过 `paths:` frontmatter 按需加载，不工作于 Python 时完全不消耗 Python 规则的 tokens。
+### 五层防御体系
 
-2. **注意力集中**：研究表明 LLM 能可靠遵循约 150-200 条指令。本模板总指令数控制在 ~60 条，且每个上下文窗口中实际激活的更少。5 条以内的文件各 ~30 行，比单个 150 行文件有更高的规则遵循率（~96% vs ~92%）。
+| 层 | 机制 | 特点 | 示例 |
+|----|------|------|------|
+| 1 | **CLAUDE.md** | 每次加载，~300 词 | 5 条铁律、工作流指引 |
+| 2 | **Rules** | `paths:` 按需加载 | TS 类型规范、Python 惯例、DB 规则 |
+| 3 | **Skills** | Claude 自动判断/手动 `/skill` | TDD 流程、架构规划、排错流程 |
+| 4 | **Hooks** | 确定性执行，0 token | 拦截危险命令、保护敏感文件 |
+| 5 | **Agents** | 手动委派 | 代码审查专家 |
 
-3. **可维护**：每个文件职责单一。修改 Redis 规则不需要通读 TypeScript 约定。
+### Token 效率
 
-## 使用方法
+| 场景 | 加载内容 | ~tokens |
+|------|---------|---------|
+| 写 TypeScript | CLAUDE.md + ts rules + skill 元数据 | ~900 |
+| 写 Python | CLAUDE.md + py rules + skill 元数据 | ~800 |
+| 纯规划 | CLAUDE.md + skill 元数据 | ~600 |
+| 调用 /tdd-workflow | 上述 + skill 完整内容 | ~1200 |
+
+## 快速开始
 
 1. **从此模板创建新仓库**
-2. **编辑 `CLAUDE.md`**：
-   - 替换顶部注释为你的项目一句话描述
-   - 填入实际的 dev/build/test/lint 命令
-   - 随着开发推进，在 `Known Gotchas` 部分积累你遇到的真实陷阱
-3. **按需裁剪 `.claude/rules/`**：
-   - 纯 TypeScript 项目？删除 `python.md`
-   - 不用 Next.js？删掉 `typescript.md` 中的 App Router 部分
-   - 不用 Redis？删掉 `data-layer.md` 中的 Redis 部分
-4. **按需扩展**：
-   - 新增 `.claude/rules/testing.md` 写测试规范
-   - 新增 `.claude/rules/api-design.md` 写 API 设计约定
-   - 使用 `paths:` frontmatter 限定作用域
 
-## 核心理念
+2. **编辑 `CLAUDE.md`**：填入项目描述、实际命令
 
-- **CLAUDE.md 只放"每次都需要"的内容**：铁律、工作流、通用代码风格
-- **技术栈规则放 rules/ 并用 paths 限定**：按需加载，零浪费
-- **具体 > 抽象**：`NEVER use @ts-ignore` 比 `保持类型安全` 有效 10 倍
-- **指令而非理念**：Claude 不需要知道"为什么"，只需要知道"做什么"和"不做什么"
-- **持续演进**：遇到 Claude 反复犯的错 → 加一条规则。没出过问题的 → 不加规则
+3. **裁剪不需要的 rules**：
+   - 纯 TS 项目 → 删除 `python.md`
+   - 不用 Next.js → 删 `typescript.md` 中 App Router 段落
+   - 不用 Redis → 删 `data-layer.md` 中 Redis 段落
+
+4. **启用格式化 Hook**（可选，按你的工具链修改）：
+   编辑 `.claude/settings.json`，在 PostToolUse 添加：
+   ```json
+   {
+     "matcher": "Edit|MultiEdit|Write",
+     "hooks": [{
+       "type": "command",
+       "command": "jq -r '.tool_input.file_path' | xargs npx prettier --write 2>/dev/null || true"
+     }]
+   }
+   ```
+
+5. **随使用演进**：
+   - Claude 反复犯某个错 → 加一条 Rule
+   - 某个多步骤流程你经常重复 → 做成 Skill
+   - 某个动作必须 100% 执行 → 做成 Hook
+   - 没出过问题的 → 不加规则
